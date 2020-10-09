@@ -58,7 +58,7 @@ namespace interpreter
             }
         }
 
-        static void Error(int line, int col, string message)
+        internal static void Error(int line, int col, string message)
         {
             Report(line, col, message);
         }
