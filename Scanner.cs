@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using static interpreter.TokenType;
+using static System.Char;
 
 namespace interpreter
 {
@@ -11,6 +12,26 @@ namespace interpreter
         private int start = 0;
         private int current = 0;
         private int line = 1;
+
+        private static readonly Dictionary<string, TokenType> keywords = new Dictionary<string, TokenType>()
+        {
+            ["and"] = AND,
+            ["class"] = CLASS,
+            ["else"] = ELSE,
+            ["false"] = FALSE,
+            ["for"] = FOR,
+            ["fun"] = FUN,
+            ["if"] = IF,
+            ["nil"] = NIL,
+            ["or"] = OR,
+            ["print"] = PRINT,
+            ["return"] = RETURN,
+            ["super"] = SUPER,
+            ["this"] = THIS,
+            ["true"] = TRUE,
+            ["var"] = VAR,
+            ["while"] = WHILE,
+        };
 
         public Scanner(string source)
         {
@@ -53,6 +74,9 @@ namespace interpreter
                 case '>': AddToken(Match('=') ? GREATER_EQUAL : GREATER); break;
                 case '\n': line++; break;
                 case ' ': case '\r': case '\t': break;
+                case '"': AddString(); break;
+                case var digit when IsDigit(c): AddNumber(); break;
+                case var alpha when isAllowedAlpha(c): AddIdentifier(); break;
 
                 case '/':
                     if (Match('/'))
@@ -71,6 +95,64 @@ namespace interpreter
                     Program.Error(line, -1, $"Unexpected character {c}");
                     break;
             }
+        }
+
+        private void AddIdentifier()
+        {
+            while (isAllowedAlphaOrDigit(Peek()))
+            {
+                Advance();
+            }
+
+            var text = source.Substring(start, current - start);
+            if (!keywords.TryGetValue(text, out var tokenType))
+            {
+                tokenType = IDENTIFIER;
+            }
+            AddToken(tokenType);
+        }
+
+        private void AddNumber()
+        {
+            while (IsDigit(Peek()))
+            {
+                Advance();
+            }
+
+            if (Peek() == '.' && IsDigit(PeekNext()))
+            {
+                Advance();
+
+                while (IsDigit(Peek()))
+                {
+                    Advance();
+                }
+            }
+
+            AddToken(NUMBER, Double.Parse(source.Substring(start, current - start)));
+        }
+
+        private void AddString()
+        {
+            while (Peek() != '"' && !isAtEnd())
+            {
+                if (Peek() == '\n')
+                {
+                    line++;
+                }
+                Advance();
+            }
+
+            if (isAtEnd())
+            {
+                Program.Error(line, -1, "Unterminated string detected");
+                return;
+            }
+
+            Advance();
+
+            var value = source.Substring(start + 1, current - start - 1);
+            AddToken(STRING, value);
         }
 
         private bool Match(char expected)
@@ -103,6 +185,11 @@ namespace interpreter
 
         private char Peek() => isAtEnd() ? '\0' : source[current];
 
+        private char PeekNext() => current + 1 > source.Length ? '\0' : source[current + 1];
+
         private bool isAtEnd() => current >= source.Length;
+
+        private bool isAllowedAlpha(char c) => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+        private bool isAllowedAlphaOrDigit(char c) => IsDigit(c) || isAllowedAlpha(c);
     }
 }
